@@ -28,9 +28,7 @@ class EmailSummary(Base, TimestampMixin):
         ForeignKey("clients.id"), unique=True, nullable=False
     )
     # Denormalized for the admin/superuser reports, which count/group by firm.
-    firm_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("firms.id"), index=True, nullable=False
-    )
+    firm_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("firms.id"), index=True, nullable=False)
 
     # --- Encrypted payload ---
     payload_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

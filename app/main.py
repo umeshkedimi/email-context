@@ -6,6 +6,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.router import api_router
 from app.core.logging import configure_logging, get_logger
 
 configure_logging()
@@ -57,3 +58,6 @@ async def request_context(request: Request, call_next):
 @app.get("/health", tags=["ops"])
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
+
+
+app.include_router(api_router)

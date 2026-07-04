@@ -1,7 +1,7 @@
 import enum
 
 
-class Role(str, enum.Enum):
+class Role(enum.StrEnum):
     """Access-control roles.
 
     - accountant: reads client context within their own firm
@@ -14,12 +14,12 @@ class Role(str, enum.Enum):
     superuser = "superuser"
 
 
-class EmailDirection(str, enum.Enum):
+class EmailDirection(enum.StrEnum):
     inbound = "inbound"  # client -> firm
     outbound = "outbound"  # firm -> client
 
 
-class SummaryStatus(str, enum.Enum):
+class SummaryStatus(enum.StrEnum):
     ready = "ready"
     processing = "processing"
     failed = "failed"

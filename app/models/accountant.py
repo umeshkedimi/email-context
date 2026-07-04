@@ -1,7 +1,7 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, uuid_pk

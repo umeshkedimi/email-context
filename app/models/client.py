@@ -15,9 +15,7 @@ class Client(Base, TimestampMixin):
     __table_args__ = (UniqueConstraint("firm_id", "email", name="uq_client_firm_email"),)
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    firm_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("firms.id"), index=True, nullable=False
-    )
+    firm_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("firms.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(nullable=False)
     email: Mapped[str] = mapped_column(nullable=False)
 
