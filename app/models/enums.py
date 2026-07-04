@@ -1,0 +1,25 @@
+import enum
+
+
+class Role(str, enum.Enum):
+    """Access-control roles.
+
+    - accountant: reads client context within their own firm
+    - firm_admin: accountant privileges + firm-level reporting
+    - superuser: cross-firm (Ascend-level) reporting; not bound to a firm
+    """
+
+    accountant = "accountant"
+    firm_admin = "firm_admin"
+    superuser = "superuser"
+
+
+class EmailDirection(str, enum.Enum):
+    inbound = "inbound"  # client -> firm
+    outbound = "outbound"  # firm -> client
+
+
+class SummaryStatus(str, enum.Enum):
+    ready = "ready"
+    processing = "processing"
+    failed = "failed"
