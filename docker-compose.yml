@@ -1,0 +1,51 @@
+# Full stack for reviewers: `docker compose up --build`.
+# Local dev on a machine with Postgres/Redis already installed can skip this
+# and point DATABASE_URL / REDIS_URL at the native services instead.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ec_user
+      POSTGRES_PASSWORD: ec_pass
+      POSTGRES_DB: email_context
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ec_user -d email_context"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://ec_user:ec_pass@db:5432/email_context
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.seed &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  pgdata:
