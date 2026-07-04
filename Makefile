@@ -1,25 +1,25 @@
-.PHONY: install migrate seed run test lint fmt dev-db
+.PHONY: install migrate revision seed run test lint fmt
 
 install:
-	python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
+	uv sync
 
 migrate:
-	alembic upgrade head
+	uv run alembic upgrade head
 
 revision:
-	alembic revision --autogenerate -m "$(m)"
+	uv run alembic revision --autogenerate -m "$(m)"
 
 seed:
-	python -m app.seed
+	uv run python -m app.seed
 
 run:
-	uvicorn app.main:app --reload
+	uv run uvicorn app.main:app --reload
 
 test:
-	pytest -q
+	uv run pytest -q
 
 lint:
-	ruff check app tests
+	uv run ruff check app tests
 
 fmt:
-	ruff check --fix app tests
+	uv run ruff check --fix app tests

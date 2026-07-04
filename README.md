@@ -34,9 +34,12 @@ docker compose up --build
 
 ### Option B — native (Postgres + Redis already installed)
 
+Uses [uv](https://docs.astral.sh/uv/) for dependency management. `uv sync` reads
+the pinned `.python-version`, provisions Python 3.12, and installs the exact
+versions from `uv.lock`.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+uv sync                # creates .venv (Python 3.12) from the lockfile
 cp .env.example .env   # fill in secrets (see below)
 make migrate && make seed
 make run               # http://localhost:8000/docs

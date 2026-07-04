@@ -2,7 +2,7 @@
 name = "email-context"
 version = "0.1.0"
 description = "Email Context & Summarization System — unified per-client email intelligence for CPA firms"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -11,6 +11,7 @@ dependencies = [
     "alembic>=1.14",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "email-validator>=2.2",
     "redis>=5.2",
     "pyjwt>=2.10",
     "bcrypt>=4.2",
@@ -21,7 +22,8 @@ dependencies = [
     "python-multipart>=0.0.12",
 ]
 
-[project.optional-dependencies]
+# PEP 735 dependency group — installed by `uv sync` by default, excluded with --no-dev.
+[dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
@@ -35,7 +37,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
