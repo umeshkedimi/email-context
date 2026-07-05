@@ -51,6 +51,8 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 |---|---|---|---|
 | **AES-256-GCM application-level encryption** of summary payloads at rest | Rely only on disk/DB encryption; store plaintext | Summaries contain client-confidential content. App-level AEAD (GCM gives confidentiality **and** integrity) protects the data even if a DB dump leaks, independent of infra config. | Encrypted columns aren't queryable, and key management becomes our responsibility. Non-sensitive tracking fields stay plaintext so they remain queryable. |
 | **`key_version` stored with each ciphertext** | Single fixed key | Enables key rotation: new writes use the current key while old rows remain decryptable under their recorded version. | A little extra bookkeeping per row. Standard practice for encryption at rest. |
+| **Associated data (AAD) = client id** on every summary ciphertext | Encrypt without AAD | Authentication now also covers *which client* a ciphertext belongs to, so a valid blob copied onto another client's row fails to decrypt. | Callers must pass the same client id on read; a mismatch is treated as corruption. |
+| **Redis caches ciphertext + metadata, never plaintext** | Cache the decrypted summary; don't cache at all | Keeps the at-rest encryption boundary intact through the cache — a Redis dump leaks nothing readable — while still saving the DB round-trip. Staleness is always computed live, so a cached payload never hides new email. | A cache hit still pays one decrypt. Negligible, and worth it for the security property. |
 
 ## 6. Engineering & tooling
 
