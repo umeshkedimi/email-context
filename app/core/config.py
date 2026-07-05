@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Application configuration, loaded from environment / .env.
 
     Secrets never have defaults that would be safe in production; the encryption
-    key and Gemini key must be provided explicitly.
+    key and LLM API key must be provided explicitly.
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -25,10 +25,13 @@ class Settings(BaseSettings):
     summary_encryption_key: str = ""  # base64-encoded 32 bytes
     summary_encryption_key_version: int = 1
 
-    # LLM
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    # LLM (provider-neutral; kept pluggable behind the LLMProvider interface)
+    llm_provider: str = "openai"
+    llm_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
     llm_stub_mode: bool = False
+    llm_max_retries: int = 2
+    llm_timeout_seconds: float = 30.0
 
     # Cache
     summary_cache_ttl_seconds: int = 3600
