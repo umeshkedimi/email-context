@@ -37,7 +37,7 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | **Role-Based Access Control** — `accountant` / `firm_admin` / `superuser` | Per-user permission flags | Three clear tiers map to the org (accountant → own firm; firm_admin → firm reporting; superuser → cross-firm Ascend reporting). A `require_roles()` dependency enforces it at the route. | Coarser than per-permission grants. Matches the domain; finer granularity isn't needed. |
 | **`superuser` is not bound to a firm** (`firm_id` nullable) | Give superuser a sentinel firm | Cross-firm reporting is inherently firm-less; a nullable `firm_id` models that honestly instead of faking membership. | Firm-scoping code must handle the `None` case explicitly. Small, localized. |
 
-## 4. LLM & summarization 🔜
+## 4. LLM & summarization ✅
 
 | Decision | Alternatives considered | Why we chose it | Trade-off accepted |
 |---|---|---|---|
@@ -45,7 +45,7 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | **OpenAI GPT** as the default model (pluggable) | Gemini; a single hard-wired vendor | The panel left the choice open, so we pick a capable, well-supported model and — more importantly — keep it behind the `LLMProvider` interface so the vendor is a config/implementation swap, not a rewrite. | Vendor lock-in risk if used directly; the interface neutralizes it. Model quality/cost is a tunable, not a fixed commitment. |
 | **Structured (schema-validated) output** → actors · concluded discussions · open action items | Free-form text summary | The consumer is a dashboard with defined sections; a validated schema guarantees the shape and lets us store/query parts. | The model must conform to a schema, occasionally needing a retry. Handled by the provider layer. |
 
-## 5. Data protection 🔜
+## 5. Data protection ✅
 
 | Decision | Alternatives considered | Why we chose it | Trade-off accepted |
 |---|---|---|---|
