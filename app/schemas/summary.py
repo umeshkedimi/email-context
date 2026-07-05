@@ -68,3 +68,25 @@ class SummaryResult(BaseModel):
 
     payload: SummaryPayload
     model_used: str
+
+
+class SummaryResponse(BaseModel):
+    """What the dashboard receives for one client. `payload` is null until a
+    summary has been generated. Staleness is computed live on every read."""
+
+    client_id: str
+    client_name: str
+    client_email: str
+
+    generated: bool  # has a summary ever been produced for this client?
+    payload: SummaryPayload | None = None
+
+    total_emails_count: int
+    emails_analyzed_count: int
+    new_emails_count: int  # emails not yet reflected in the summary
+    is_stale: bool  # new_emails_count > 0 (or never generated)
+
+    status: str | None = None
+    model_used: str | None = None
+    last_refreshed_at: datetime | None = None
+    updated_at: datetime | None = None

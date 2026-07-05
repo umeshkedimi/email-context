@@ -8,6 +8,11 @@ from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.logging import configure_logging, get_logger
+from app.services.exceptions import (
+    ClientNotFound,
+    NoEmailsToSummarize,
+    SummaryGenerationError,
+)
 
 configure_logging()
 log = get_logger("app.request")
@@ -53,6 +58,23 @@ async def request_context(request: Request, call_next):
     )
     response.headers["x-request-id"] = request_id
     return response
+
+
+@app.exception_handler(ClientNotFound)
+async def _handle_client_not_found(request: Request, exc: ClientNotFound) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": "Client not found"})
+
+
+@app.exception_handler(NoEmailsToSummarize)
+async def _handle_no_emails(request: Request, exc: NoEmailsToSummarize) -> JSONResponse:
+    return JSONResponse(
+        status_code=400, content={"detail": "This client has no emails to summarize"}
+    )
+
+
+@app.exception_handler(SummaryGenerationError)
+async def _handle_generation_error(request: Request, exc: SummaryGenerationError) -> JSONResponse:
+    return JSONResponse(status_code=502, content={"detail": "Summary generation failed"})
 
 
 @app.get("/health", tags=["ops"])
