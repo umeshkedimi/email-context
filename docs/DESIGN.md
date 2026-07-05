@@ -42,7 +42,7 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | Decision | Alternatives considered | Why we chose it | Trade-off accepted |
 |---|---|---|---|
 | **Provider behind an `LLMProvider` interface** | Call the vendor SDK directly from services | Swappable model/vendor, and a stub implementation lets tests and CI run with no API key or network. | One layer of indirection. Worth it for testability and vendor independence. |
-| **Gemini 2.5 Flash** as the default model | Larger/slower frontier models | Fast and inexpensive for summarization, which doesn't need a top-tier reasoning model. | Lower ceiling on reasoning quality than a premium model. Fine for structured summarization; the interface makes swapping trivial. |
+| **OpenAI GPT** as the default model (pluggable) | Gemini; a single hard-wired vendor | The panel left the choice open, so we pick a capable, well-supported model and — more importantly — keep it behind the `LLMProvider` interface so the vendor is a config/implementation swap, not a rewrite. | Vendor lock-in risk if used directly; the interface neutralizes it. Model quality/cost is a tunable, not a fixed commitment. |
 | **Structured (schema-validated) output** → actors · concluded discussions · open action items | Free-form text summary | The consumer is a dashboard with defined sections; a validated schema guarantees the shape and lets us store/query parts. | The model must conform to a schema, occasionally needing a retry. Handled by the provider layer. |
 
 ## 5. Data protection 🔜
