@@ -20,7 +20,7 @@ One rolling summary per client, regenerated **on demand** with a live
 staleness indicator so nobody wastes an LLM call — or trusts an out-of-date view.
 
 > Take-home case study — Backend Engineer @ Ascend. Python / FastAPI, PostgreSQL,
-> Redis, and a pluggable LLM (OpenAI by default). The backend is the focus; a thin
+> Redis, and a pluggable LLM (Gemini or OpenAI). The backend is the focus; a thin
 > web UI (see [Web UI](#web-ui)) and a live deployment round it out.
 
 ---
@@ -57,7 +57,7 @@ HTTP ─▶ api/ (FastAPI routers)         validation, auth dependency, HTTP map
           ├──▶ repositories/           all SQL lives here (async SQLAlchemy 2.0)
           ├──▶ core/crypto             AES-256-GCM encrypt/decrypt at rest
           ├──▶ core/cache              Redis (ciphertext only, best-effort)
-          └──▶ services/llm            LLMProvider interface (OpenAI | stub)
+          └──▶ services/llm            LLMProvider interface (Gemini | OpenAI | stub)
 ```
 
 **Stack:** Python 3.12 · FastAPI · async SQLAlchemy 2.0 + psycopg3 · PostgreSQL 16 ·
@@ -121,8 +121,10 @@ python -c "import secrets; print('JWT_SECRET=' + secrets.token_urlsafe(48))"
 python -c "import base64,os; print('SUMMARY_ENCRYPTION_KEY=' + base64.b64encode(os.urandom(32)).decode())"
 ```
 
-Set `LLM_API_KEY` for real summaries, or leave it empty / `LLM_STUB_MODE=true`
-to run keyless with the deterministic stub.
+Pick a backend with `LLM_PROVIDER` (`gemini`, `openai`, or `stub`) and set
+`LLM_API_KEY` + `LLM_MODEL` to match (e.g. `gemini` / `gemini-2.0-flash`, or
+`openai` / `gpt-4o-mini`). Leave the key empty or set `LLM_STUB_MODE=true` to run
+keyless with the deterministic stub.
 
 ## Demo walkthrough
 
@@ -253,8 +255,9 @@ observability.
 The summarizer is the AI surface, and it's built to be trustworthy and swappable:
 
 - **Provider interface.** `LLMProvider` (`app/services/llm/`) abstracts the vendor.
-  `OpenAIProvider` is the default; `StubProvider` is deterministic and keyless for
-  tests/CI/demos. Switching vendor is a config + one-class change, not a rewrite.
+  Two real backends ship behind it — `GeminiProvider` (the brief's named API) and
+  `OpenAIProvider` — plus `StubProvider`, a deterministic keyless backend for
+  tests/CI/demos. Switching vendor is one env var (`LLM_PROVIDER`), not a rewrite.
 - **Structured output.** The model must return a schema-validated payload (actors,
   concluded discussions, open action items) — the dashboard's exact shape.
 - **Anti-hallucination.** The system prompt constrains the model to facts present
