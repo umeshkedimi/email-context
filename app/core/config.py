@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     llm_stub_mode: bool = False
     llm_max_retries: int = 2
     llm_timeout_seconds: float = 30.0
+    # 0 for grounded extraction: keep summaries faithful to the emails and
+    # reproducible, rather than letting the model embellish.
+    llm_temperature: float = 0.0
 
     # Cache
     summary_cache_ttl_seconds: int = 3600

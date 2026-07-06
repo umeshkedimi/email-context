@@ -90,6 +90,7 @@ class OpenAIJudge:
                 {"role": "user", "content": _build_judge_prompt(context, candidate)},
             ],
             response_format=JudgeVerdict,
+            temperature=0,  # deterministic grading — a judge shouldn't wobble
         )
         verdict = completion.choices[0].message.parsed
         if verdict is None:

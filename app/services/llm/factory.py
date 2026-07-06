@@ -34,6 +34,7 @@ def get_llm_provider() -> LLMProvider:
             model=s.llm_model,
             max_retries=s.llm_max_retries,
             timeout=s.llm_timeout_seconds,
+            temperature=s.llm_temperature,
         )
 
     raise ValueError(f"unknown LLM_PROVIDER: {s.llm_provider!r}")

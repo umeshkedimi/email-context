@@ -43,10 +43,13 @@ def _log_retry(state: RetryCallState) -> None:
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, *, api_key: str, model: str, max_retries: int, timeout: float):
+    def __init__(
+        self, *, api_key: str, model: str, max_retries: int, timeout: float, temperature: float
+    ):
         self._client = AsyncOpenAI(api_key=api_key, timeout=timeout)
         self._model = model
         self._max_retries = max_retries
+        self._temperature = temperature
 
     async def summarize(self, context: SummaryContext) -> SummaryResult:
         system, user = build_prompt(context)
@@ -68,6 +71,7 @@ class OpenAIProvider(LLMProvider):
                             {"role": "user", "content": user},
                         ],
                         response_format=SummaryPayload,
+                        temperature=self._temperature,
                     )
         except Exception as exc:
             log.error(
