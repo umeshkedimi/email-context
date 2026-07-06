@@ -25,22 +25,11 @@ def get_llm_provider() -> LLMProvider:
             log.warning("llm_no_api_key_falling_back_to_stub")
         return StubProvider()
 
-    # Providers are imported lazily so environments running only the stub (tests,
-    # no-key demos) don't need any vendor SDK installed/loaded.
     if s.llm_provider == "openai":
+        # Imported lazily so environments running only the stub don't need the SDK.
         from app.services.llm.openai_provider import OpenAIProvider
 
         return OpenAIProvider(
-            api_key=s.llm_api_key,
-            model=s.llm_model,
-            max_retries=s.llm_max_retries,
-            timeout=s.llm_timeout_seconds,
-        )
-
-    if s.llm_provider == "gemini":
-        from app.services.llm.gemini_provider import GeminiProvider
-
-        return GeminiProvider(
             api_key=s.llm_api_key,
             model=s.llm_model,
             max_retries=s.llm_max_retries,

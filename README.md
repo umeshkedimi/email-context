@@ -20,7 +20,7 @@ One rolling summary per client, regenerated **on demand** with a live
 staleness indicator so nobody wastes an LLM call — or trusts an out-of-date view.
 
 > Take-home case study — Backend Engineer @ Ascend. Python / FastAPI, PostgreSQL,
-> Redis, and a pluggable LLM (Gemini or OpenAI). The backend is the focus; a thin
+> Redis, and a pluggable LLM (OpenAI by default). The backend is the focus; a thin
 > web UI (see [Web UI](#web-ui)) and a live deployment round it out.
 
 ---
@@ -57,7 +57,7 @@ HTTP ─▶ api/ (FastAPI routers)         validation, auth dependency, HTTP map
           ├──▶ repositories/           all SQL lives here (async SQLAlchemy 2.0)
           ├──▶ core/crypto             AES-256-GCM encrypt/decrypt at rest
           ├──▶ core/cache              Redis (ciphertext only, best-effort)
-          └──▶ services/llm            LLMProvider interface (Gemini | OpenAI | stub)
+          └──▶ services/llm            LLMProvider interface (OpenAI | stub)
 ```
 
 **Stack:** Python 3.12 · FastAPI · async SQLAlchemy 2.0 + psycopg3 · PostgreSQL 16 ·
@@ -121,10 +121,8 @@ python -c "import secrets; print('JWT_SECRET=' + secrets.token_urlsafe(48))"
 python -c "import base64,os; print('SUMMARY_ENCRYPTION_KEY=' + base64.b64encode(os.urandom(32)).decode())"
 ```
 
-Pick a backend with `LLM_PROVIDER` (`gemini`, `openai`, or `stub`) and set
-`LLM_API_KEY` + `LLM_MODEL` to match (e.g. `gemini` / `gemini-2.0-flash`, or
-`openai` / `gpt-4o-mini`). Leave the key empty or set `LLM_STUB_MODE=true` to run
-keyless with the deterministic stub.
+Set `LLM_API_KEY` for real summaries, or leave it empty / `LLM_STUB_MODE=true`
+to run keyless with the deterministic stub.
 
 ## Demo walkthrough
 
@@ -231,19 +229,9 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push/P
 ruff lint + format check + the SQLite suite (hermetic job), and the full suite
 again against Postgres + Redis service containers (fidelity job).
 
-**LLM evals (opt-in, real model).** `make eval` runs the suites in
-[`evals/`](evals/) against the real model. Two layers:
-
-- **Structural grounding** — cheap, deterministic string checks: every extracted
-  actor traces back to the emails (no hallucinated people) and obvious action
-  items/decisions are captured.
-- **Cross-vendor LLM-as-judge** — OpenAI generates, **Gemini grades**. Using a
-  *different* vendor as judge avoids the self-preference bias that inflates scores
-  when a model evaluates its own output. The judge returns a structured verdict
-  (faithfulness, hallucinated actors, coverage, rationale); evals assert on those.
-  Doubly opt-in — add `GEMINI_API_KEY` to enable it, e.g.
-  `RUN_LLM_EVALS=1 GEMINI_API_KEY=… make eval`; it skips cleanly without a key.
-
+**LLM evals (opt-in, real model).** `make eval` runs a small grounding suite in
+[`evals/`](evals/): it asserts every extracted actor traces back to the emails
+(no hallucinated people) and that obvious action items/decisions are captured.
 Kept out of CI — evals cost tokens and aren't fully deterministic. The provider
 also logs model, latency, and token usage on every call for cost/perf
 observability.
@@ -265,9 +253,8 @@ observability.
 The summarizer is the AI surface, and it's built to be trustworthy and swappable:
 
 - **Provider interface.** `LLMProvider` (`app/services/llm/`) abstracts the vendor.
-  Two real backends ship behind it — `GeminiProvider` (the brief's named API) and
-  `OpenAIProvider` — plus `StubProvider`, a deterministic keyless backend for
-  tests/CI/demos. Switching vendor is one env var (`LLM_PROVIDER`), not a rewrite.
+  `OpenAIProvider` is the default; `StubProvider` is deterministic and keyless for
+  tests/CI/demos. Switching vendor is a config + one-class change, not a rewrite.
 - **Structured output.** The model must return a schema-validated payload (actors,
   concluded discussions, open action items) — the dashboard's exact shape.
 - **Anti-hallucination.** The system prompt constrains the model to facts present

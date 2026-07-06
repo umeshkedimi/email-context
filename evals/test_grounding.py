@@ -1,4 +1,4 @@
-"""Structural grounding evals for the real LLM summarizer.
+"""Grounding evals for the real LLM summarizer.
 
 Opt-in and OUTSIDE the hermetic unit suite (`testpaths = ["tests"]`), because
 evals exercise the *actual* model — they cost tokens and aren't fully
@@ -12,23 +12,76 @@ They assert two properties that matter for summarizing sensitive client mail:
     people);
   * **coverage** — an obvious action item / decision in the thread is captured.
 
-Checks here are cheap and deterministic-ish: they compare the output against the
-email text by string overlap. That's a tight hallucination guard but a blunt
-quality signal — `test_judge.py` adds the semantic, cross-vendor view.
+Checks are lenient on wording (a proxy for a full judge/human-label eval) and
+tight on hallucination.
 """
 
 import os
 import re
+from datetime import UTC, datetime
 
 import pytest
 
-from app.schemas.summary import SummaryContext
+from app.schemas.summary import EmailForSummary, SummaryContext
 from app.services.llm.factory import get_llm_provider
-from evals.cases import EXTENSION_THREAD, W2_THREAD
 
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_LLM_EVALS") != "1",
     reason="LLM evals are opt-in: set RUN_LLM_EVALS=1 with a real LLM_API_KEY configured.",
+)
+
+
+def _email(sender: str, direction: str, subject: str, body: str, day: int) -> EmailForSummary:
+    return EmailForSummary(
+        sender=sender,
+        direction=direction,
+        subject=subject,
+        body=body,
+        sent_at=datetime(2026, 1, day, 9, 0, tzinfo=UTC),
+    )
+
+
+W2_THREAD = SummaryContext(
+    client_name="Jane Hartley",
+    client_email="jane.hartley@example.com",
+    emails=[
+        _email(
+            "diane.sterling@sterlingvance.com",
+            "outbound",
+            "Kicking off your 2024 return",
+            "Hi Jane, to begin your 2024 tax return please send your W-2 forms when you can.",
+            5,
+        ),
+        _email(
+            "jane.hartley@example.com",
+            "inbound",
+            "Re: Kicking off your 2024 return",
+            "Thanks Diane. I'll send the W-2 by Friday. We are filing jointly with my husband "
+            "this year.",
+            6,
+        ),
+    ],
+)
+
+EXTENSION_THREAD = SummaryContext(
+    client_name="Grant Okafor",
+    client_email="grant.okafor@example.com",
+    emails=[
+        _email(
+            "grant.okafor@example.com",
+            "inbound",
+            "Brokerage forms delayed",
+            "I don't think I'll have my brokerage 1099s in time. Can we file an extension?",
+            5,
+        ),
+        _email(
+            "marcus.webb@sterlingvance.com",
+            "outbound",
+            "Re: Brokerage forms delayed",
+            "Yes, we'll file Form 4868 for a six-month extension. No action needed from you now.",
+            6,
+        ),
+    ],
 )
 
 

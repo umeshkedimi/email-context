@@ -18,9 +18,7 @@ run:
 test:
 	uv run pytest -q
 
-# LLM evals — opt-in, cost tokens. Structural grounding runs with a real
-# LLM_API_KEY; the cross-vendor LLM-as-judge (OpenAI generates, Gemini grades)
-# also runs when GEMINI_API_KEY is set, and skips cleanly when it isn't.
+# LLM grounding evals — opt-in, needs a real LLM_API_KEY configured (costs tokens).
 eval:
 	RUN_LLM_EVALS=1 uv run pytest evals -v
 
