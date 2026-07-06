@@ -20,8 +20,8 @@ One rolling summary per client, regenerated **on demand** with a live
 staleness indicator so nobody wastes an LLM call — or trusts an out-of-date view.
 
 > Take-home case study — Backend Engineer @ Ascend. Python / FastAPI, PostgreSQL,
-> Redis, and a pluggable LLM (OpenAI by default). Phase 1 (this repo) is the
-> backend; a thin UI is Phase 2.
+> Redis, and a pluggable LLM (OpenAI by default). The backend is the focus; a thin
+> web UI (see [Web UI](#web-ui)) and a live deployment round it out.
 
 ---
 
@@ -33,11 +33,13 @@ staleness indicator so nobody wastes an LLM call — or trusts an out-of-date vi
 - [Demo walkthrough](#demo-walkthrough)
 - [API](#api)
 - [Roles & access control](#roles--access-control)
+- [Web UI](#web-ui)
 - [Testing & CI](#testing--ci)
 - [Security](#security)
 - [AI in this system](#ai-in-this-system)
 - [Deployment](#deployment)
 - [Project layout](#project-layout)
+- [License](#license)
 
 ---
 
@@ -191,6 +193,22 @@ Interactive docs at `/docs`. All `/api/v1` routes except login require a
 Enforced two ways: a `require_roles(...)` dependency gates routes (→ 403), and the
 service layer scopes every query to the caller's firm (cross-firm → 404).
 
+## Web UI
+
+A thin browser client ships in [`app/web/`](app/web/), served **same-origin** by
+FastAPI (`StaticFiles`) — no separate frontend build, no CORS. It is a pure
+consumer of the JSON API above: it holds the JWT, attaches it as a bearer token,
+and renders what the API returns. Four screens cover the product — login, the firm
+dashboard (client roster + staleness), a client summary with a **Regenerate**
+button (the only LLM trigger), and the superuser network rollup — with role-aware
+navigation.
+
+Vanilla HTML/CSS/JS, no framework: the point is to showcase the backend, and the
+UI proves the API is complete enough that a client is just another consumer. All
+server- and model-originated text is HTML-escaped before render. The JWT is kept
+in `localStorage` — a conscious trade-off for a thin demo (an httpOnly cookie +
+CSRF is the production path); see [docs/DESIGN.md](docs/DESIGN.md) §7.
+
 ## Testing & CI
 
 ```bash
@@ -280,3 +298,7 @@ tests/           hermetic pytest suite
 docs/DESIGN.md   trade-off decision record
 deploy/          systemd unit
 ```
+
+## License
+
+Released under the [MIT License](LICENSE).
