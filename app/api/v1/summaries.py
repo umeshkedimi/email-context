@@ -22,6 +22,7 @@ router = APIRouter(prefix="/clients", tags=["summaries"])
     "/{client_id}/summary",
     response_model=SummaryResponse,
     summary="Read a client's summary (+ live staleness)",
+    operation_id="read_client_summary",
     responses={**UNAUTHORIZED, **CLIENT_NOT_FOUND},
 )
 async def get_summary(
@@ -38,6 +39,7 @@ async def get_summary(
     "/{client_id}/summary/refresh",
     response_model=SummaryResponse,
     summary="Regenerate a client's summary (the only LLM call)",
+    operation_id="refresh_client_summary",
     responses={**UNAUTHORIZED, **CLIENT_NOT_FOUND, **NO_EMAILS, **GENERATION_FAILED},
 )
 async def refresh_summary(

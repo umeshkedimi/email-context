@@ -134,7 +134,7 @@ async def _handle_report_scope(request: Request, exc: ReportScopeError) -> JSONR
     )
 
 
-@app.get("/health", tags=["ops"], summary="Liveness probe")
+@app.get("/health", tags=["ops"], summary="Liveness probe", operation_id="health_check")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 

@@ -8,7 +8,7 @@ consistent end to end.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Actor(BaseModel):
@@ -90,3 +90,39 @@ class SummaryResponse(BaseModel):
     model_used: str | None = None
     last_refreshed_at: datetime | None = None
     updated_at: datetime | None = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "client_id": "3f9a1b2c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                    "client_name": "Hartley Family",
+                    "client_email": "hartley.family@example.com",
+                    "generated": True,
+                    "payload": {
+                        "overview": "The Hartleys' 2024 joint return is underway. Filing "
+                        "status is settled; we are waiting on their W-2s before the "
+                        "return can be drafted.",
+                        "actors": [
+                            {"name": "Jane Hartley", "role": "client"},
+                            {"name": "Diane Sterling", "role": "accountant"},
+                        ],
+                        "concluded_discussions": [
+                            "Filing status confirmed as married filing jointly"
+                        ],
+                        "open_action_items": [
+                            {"description": "Send 2024 W-2 forms", "owner": "Jane Hartley"}
+                        ],
+                    },
+                    "total_emails_count": 9,
+                    "emails_analyzed_count": 8,
+                    "new_emails_count": 1,
+                    "is_stale": True,
+                    "status": "ready",
+                    "model_used": "gpt-4o-mini",
+                    "last_refreshed_at": "2026-07-01T14:30:00Z",
+                    "updated_at": "2026-07-01T14:30:00Z",
+                }
+            ]
+        }
+    )

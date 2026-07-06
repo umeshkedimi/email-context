@@ -8,7 +8,7 @@ superuser to read without decrypting anything.
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class ClientReportRow(BaseModel):
@@ -36,6 +36,34 @@ class FirmReport(BaseModel):
     total_emails: int
     clients: list[ClientReportRow]
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "firm_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                    "firm_name": "Sterling & Vance CPAs",
+                    "total_clients": 4,
+                    "clients_with_summary": 3,
+                    "clients_stale": 1,
+                    "total_emails": 34,
+                    "clients": [
+                        {
+                            "client_id": "3f9a1b2c-4d5e-6f70-8192-a3b4c5d6e7f8",
+                            "client_name": "Hartley Family",
+                            "client_email": "hartley.family@example.com",
+                            "total_emails": 9,
+                            "emails_analyzed_count": 8,
+                            "new_emails_count": 1,
+                            "has_summary": True,
+                            "is_stale": True,
+                            "last_refreshed_at": "2026-07-01T14:30:00Z",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
 
 class FirmReportRow(BaseModel):
     """A single firm's aggregate line in the network report."""
@@ -58,3 +86,27 @@ class NetworkReport(BaseModel):
     clients_stale: int
     total_emails: int
     firms: list[FirmReportRow]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "total_firms": 2,
+                    "total_clients": 6,
+                    "clients_with_summary": 4,
+                    "clients_stale": 3,
+                    "total_emails": 40,
+                    "firms": [
+                        {
+                            "firm_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                            "firm_name": "Sterling & Vance CPAs",
+                            "total_clients": 4,
+                            "clients_with_summary": 3,
+                            "clients_stale": 1,
+                            "total_emails": 34,
+                        }
+                    ],
+                }
+            ]
+        }
+    )

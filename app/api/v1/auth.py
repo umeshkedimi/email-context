@@ -15,6 +15,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/login",
     response_model=TokenResponse,
     summary="Log in (email + password → JWT)",
+    operation_id="login",
     responses={**BAD_LOGIN},
 )
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
@@ -38,6 +39,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> Token
     "/me",
     response_model=CurrentUser,
     summary="The authenticated principal",
+    operation_id="read_current_user",
     responses={**UNAUTHORIZED},
 )
 async def me(current: CurrentUser = Depends(get_current_user)) -> CurrentUser:

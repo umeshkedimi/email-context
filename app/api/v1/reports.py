@@ -22,6 +22,7 @@ _require_superuser = require_roles("superuser")
     "/firm",
     response_model=FirmReport,
     summary="Firm dashboard (client roster + staleness)",
+    operation_id="read_firm_report",
     responses={**UNAUTHORIZED, **FORBIDDEN, **REPORT_SCOPE, **FIRM_NOT_FOUND},
 )
 async def firm_report(
@@ -42,6 +43,7 @@ async def firm_report(
     "/network",
     response_model=NetworkReport,
     summary="Network rollup across all firms",
+    operation_id="read_network_report",
     responses={**UNAUTHORIZED, **FORBIDDEN},
 )
 async def network_report(
