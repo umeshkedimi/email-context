@@ -1,10 +1,12 @@
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.logging import configure_logging, get_logger
@@ -98,3 +100,9 @@ async def health() -> JSONResponse:
 
 
 app.include_router(api_router)
+
+# Serve the thin web client. Mounted LAST so it only catches paths the API
+# routes above didn't claim; `/api/v1/...`, `/health`, and `/docs` still resolve
+# first. html=True serves index.html at "/". Same origin as the API → no CORS.
+WEB_DIR = Path(__file__).parent / "web"
+app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

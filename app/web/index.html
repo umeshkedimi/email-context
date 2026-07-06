@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Email Context · Ascend</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📨</text></svg>"
+    />
+  </head>
+  <body>
+    <!-- Login view -->
+    <section id="view-login" class="view login" hidden>
+      <form id="login-form" class="card login-card" autocomplete="on">
+        <div class="brand"><span class="brand-mark">📨</span> Email Context</div>
+        <p class="muted">Ascend · unified per-client email intelligence</p>
+        <label>
+          Email
+          <input id="login-email" type="email" required autocomplete="username"
+                 placeholder="you@firm.com" />
+        </label>
+        <label>
+          Password
+          <input id="login-password" type="password" required
+                 autocomplete="current-password" placeholder="••••••••" />
+        </label>
+        <button type="submit" class="btn primary" id="login-submit">Sign in</button>
+        <p id="login-error" class="error" hidden></p>
+        <p class="hint muted">Demo accounts use password <code>Demo1234!</code></p>
+      </form>
+    </section>
+
+    <!-- App shell (shown once authenticated) -->
+    <section id="view-app" class="view app" hidden>
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">📨</span> Email Context</div>
+        <nav id="nav" class="nav"></nav>
+        <div class="who">
+          <span id="who-name" class="who-name"></span>
+          <span id="who-role" class="pill"></span>
+          <button id="logout" class="btn ghost">Sign out</button>
+        </div>
+      </header>
+      <main id="content" class="content">
+        <!-- Populated by the view controllers in app.js -->
+      </main>
+    </section>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
