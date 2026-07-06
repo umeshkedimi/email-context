@@ -1,11 +1,11 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 import app.models  # noqa: F401  — registers all tables on Base.metadata
+from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
 
@@ -32,9 +32,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection) -> None:
-    context.configure(
-        connection=connection, target_metadata=target_metadata, compare_type=True
-    )
+    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
     with context.begin_transaction():
         context.run_migrations()
 

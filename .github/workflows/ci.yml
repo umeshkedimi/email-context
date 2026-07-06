@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    # Hermetic: no services. Proves `uv run pytest` works with zero infra
+    # (in-memory SQLite, stub LLM, cache degrades to a miss).
+    name: Lint + test (SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies (pinned by uv.lock)
+        run: uv sync --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Pytest
+        run: uv run pytest -q
+
+  test-postgres:
+    # Full fidelity: the identical suite against Postgres + Redis, so the
+    # aggregate report SQL is exercised on the engine the app ships on.
+    name: Test (Postgres + Redis)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ec_user
+          POSTGRES_PASSWORD: ec_pass
+          POSTGRES_DB: email_context_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ec_user -d email_context_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://ec_user:ec_pass@localhost:5432/email_context_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies (pinned by uv.lock)
+        run: uv sync --frozen
+
+      - name: Pytest against Postgres
+        run: uv run pytest -q
