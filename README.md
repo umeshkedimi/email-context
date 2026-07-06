@@ -231,9 +231,19 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push/P
 ruff lint + format check + the SQLite suite (hermetic job), and the full suite
 again against Postgres + Redis service containers (fidelity job).
 
-**LLM evals (opt-in, real model).** `make eval` runs a small grounding suite in
-[`evals/`](evals/): it asserts every extracted actor traces back to the emails
-(no hallucinated people) and that obvious action items/decisions are captured.
+**LLM evals (opt-in, real model).** `make eval` runs the suites in
+[`evals/`](evals/) against the real model. Two layers:
+
+- **Structural grounding** — cheap, deterministic string checks: every extracted
+  actor traces back to the emails (no hallucinated people) and obvious action
+  items/decisions are captured.
+- **Cross-vendor LLM-as-judge** — OpenAI generates, **Gemini grades**. Using a
+  *different* vendor as judge avoids the self-preference bias that inflates scores
+  when a model evaluates its own output. The judge returns a structured verdict
+  (faithfulness, hallucinated actors, coverage, rationale); evals assert on those.
+  Doubly opt-in — add `GEMINI_API_KEY` to enable it, e.g.
+  `RUN_LLM_EVALS=1 GEMINI_API_KEY=… make eval`; it skips cleanly without a key.
+
 Kept out of CI — evals cost tokens and aren't fully deterministic. The provider
 also logs model, latency, and token usage on every call for cost/perf
 observability.
