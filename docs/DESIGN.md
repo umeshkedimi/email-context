@@ -65,6 +65,7 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | **Async SQLAlchemy 2.0 + psycopg3** | Sync SQLAlchemy | The app is I/O-bound (DB + LLM calls); async lets a request await the LLM without blocking a worker. | Async is more error-prone (session handling, no lazy loads). Contained by the repository layer. |
 | **structlog JSON logs + per-request request-id** | Plain text logging | Structured logs are queryable in aggregation tools, and a request-id ties every line of one request together for debugging. | Slightly noisier locally than plain text. Worth it for real observability. |
 | **Alembic migrations committed to git** | Auto-create tables from models on boot | Versioned, reviewable schema changes; the same migration runs in every environment. | Migrations must be written/checked in. Standard discipline. |
+| **Tests default to in-memory SQLite + stub LLM; the same suite runs on Postgres** | Test only against Postgres; test only against SQLite | Dialect-neutral models let `uv run pytest` run with zero services (fast local + CI feedback, no network via the stub provider, cache degrades to a miss), while `TEST_DATABASE_URL` points the identical tests at Postgres for full-fidelity coverage of the aggregate report SQL. | SQLite and Postgres differ at the edges; mitigated by also running the suite against Postgres (verified: 42/42 on both). |
 
 ---
 
