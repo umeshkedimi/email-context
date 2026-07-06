@@ -32,7 +32,8 @@ W2_THREAD = SummaryContext(
             "diane.sterling@sterlingvance.com",
             "outbound",
             "Kicking off your 2024 return",
-            "Hi Jane, to begin your 2024 tax return please send your W-2 forms when you can.",
+            "Hi Jane, to begin your 2024 tax return please send your W-2 forms when you can.\n"
+            "Best,\nDiane Sterling",
             5,
         ),
         _email(
@@ -40,7 +41,7 @@ W2_THREAD = SummaryContext(
             "inbound",
             "Re: Kicking off your 2024 return",
             "Thanks Diane. I'll send the W-2 by Friday. We are filing jointly with my husband "
-            "this year.",
+            "this year.\nJane Hartley",
             6,
         ),
     ],
@@ -55,14 +56,16 @@ EXTENSION_THREAD = SummaryContext(
             "grant.okafor@example.com",
             "inbound",
             "Brokerage forms delayed",
-            "I don't think I'll have my brokerage 1099s in time. Can we file an extension?",
+            "Hi Marcus, I don't think I'll have my brokerage 1099s in time. Can we file an "
+            "extension?\nThanks,\nGrant Okafor",
             5,
         ),
         _email(
             "marcus.webb@sterlingvance.com",
             "outbound",
             "Re: Brokerage forms delayed",
-            "Yes, we'll file Form 4868 for a six-month extension. No action needed from you now.",
+            "Yes, we'll file Form 4868 for a six-month extension. No action needed from you now.\n"
+            "Best,\nMarcus Webb",
             6,
         ),
     ],
