@@ -212,7 +212,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .owner { color: var(--muted); font-size: 0.85rem; }
 .overview { font-size: 1.02rem; line-height: 1.6; }
 
-.summary-actions { display: flex; align-items: center; gap: 12px; margin: 6px 0 22px; }
+.summary-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 6px 0 22px; }
+.summary-actions .btn.primary { width: auto; margin: 0; }
 
 .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
 
