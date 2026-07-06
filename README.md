@@ -229,9 +229,18 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push/P
 ruff lint + format check + the SQLite suite (hermetic job), and the full suite
 again against Postgres + Redis service containers (fidelity job).
 
-**LLM evals (opt-in, real model).** `make eval` runs a small grounding suite in
-[`evals/`](evals/): it asserts every extracted actor traces back to the emails
-(no hallucinated people) and that obvious action items/decisions are captured.
+**LLM evals (opt-in, real model).** `make eval` runs two suites in
+[`evals/`](evals/) against the real model:
+
+- **Structural grounding** — cheap, deterministic string checks: every extracted
+  actor traces back to the emails (no hallucinated people) and obvious action
+  items/decisions are captured.
+- **LLM-as-judge** — a stronger model (`gpt-4o`, override with `JUDGE_MODEL`)
+  grades the `gpt-4o-mini` summary on a structured rubric (faithfulness,
+  hallucinated actors, coverage, rationale); evals assert on those scores. Same
+  vendor/key as the generator — some self-preference bias remains, offset by
+  using a stronger judge model.
+
 Kept out of CI — evals cost tokens and aren't fully deterministic. The provider
 also logs model, latency, and token usage on every call for cost/perf
 observability.
