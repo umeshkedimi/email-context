@@ -38,8 +38,11 @@ pytestmark = [
 _MIN_SCORE = 4
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def judge() -> GeminiJudge:
+    # Function-scoped on purpose: the Gemini client holds an async transport bound
+    # to the event loop it's first used on, and pytest-asyncio gives each test its
+    # own loop — a module-scoped client would break on the second test.
     return GeminiJudge(
         api_key=_GEMINI_KEY,
         model=os.getenv("JUDGE_MODEL", "gemini-2.0-flash"),
