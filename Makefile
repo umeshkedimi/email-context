@@ -1,4 +1,4 @@
-.PHONY: install migrate revision seed run test lint fmt
+.PHONY: install migrate revision seed run test eval lint fmt
 
 install:
 	uv sync
@@ -17,6 +17,10 @@ run:
 
 test:
 	uv run pytest -q
+
+# LLM grounding evals — opt-in, needs a real LLM_API_KEY configured (costs tokens).
+eval:
+	RUN_LLM_EVALS=1 uv run pytest evals -v
 
 lint:
 	uv run ruff check .
