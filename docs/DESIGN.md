@@ -67,9 +67,24 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | **Alembic migrations committed to git** | Auto-create tables from models on boot | Versioned, reviewable schema changes; the same migration runs in every environment. | Migrations must be written/checked in. Standard discipline. |
 | **Tests default to in-memory SQLite + stub LLM; the same suite runs on Postgres** | Test only against Postgres; test only against SQLite | Dialect-neutral models let `uv run pytest` run with zero services (fast local + CI feedback, no network via the stub provider, cache degrades to a miss), while `TEST_DATABASE_URL` points the identical tests at Postgres for full-fidelity coverage of the aggregate report SQL. | SQLite and Postgres differ at the edges; mitigated by also running the suite against Postgres (verified: 42/42 on both). |
 
+## 7. Web UI & deployment ✅
+
+| Decision | Alternatives considered | Why we chose it | Trade-off accepted |
+|---|---|---|---|
+| **Thin UI is a pure consumer of the JSON API**, served same-origin by FastAPI (`StaticFiles`) | Server-rendered templates with cookie sessions; a separate React SPA | The UI calls the exact same `/api/v1` a reviewer would curl — no second auth path, no CORS, one deploy target. It proves the API is complete and ergonomic rather than adding a parallel surface. | The UI and API deploy and scale as one unit. Fine at this size; a real frontend team would want them split. |
+| **UI lives in the same repo** (`app/web/`, three files) | A dedicated frontend repo | At three vanilla files with no build step, a second repo + deploy + CORS config is pure ceremony. The UI is cleanly quarantined and doesn't touch the backend layers. | Mixes a little frontend into a backend repo; justified by scale, and the standard monorepo trade-off if it grew. |
+| **Vanilla HTML/CSS/JS, no framework or build step** | React/Vite; htmx | Zero toolchain, fully auditable in one `app.js`, keeps the focus on the backend. All server/LLM-originated text is HTML-escaped before render (the one XSS vector when displaying model output). | No component ergonomics. Acceptable for four screens. |
+| **JWT held in `localStorage`** | httpOnly, `SameSite` cookie + CSRF token | Keeps the API stateless and the auth story single-path — the browser is just another bearer-token client. | The token is reachable by XSS. Consciously accepted for a thin demo; the production fix is an httpOnly cookie + CSRF, plus a short access-token TTL with refresh. |
+| **nginx reverse proxy + Let's Encrypt TLS; app bound to `127.0.0.1`** | Expose uvicorn directly on a public port; terminate TLS in-app | The app never listens publicly — nginx terminates TLS and forwards to localhost, which is the standard, auditable production shape and gives free auto-renewing certs. | One more moving part (nginx + certbot). Standard operational cost. |
+| **Run as a `systemd` service; migrations on start, seeding is not** | Run under a process manager / in Docker on the host; seed on boot | systemd gives restart-on-failure, boot persistence, and one log stream (`journalctl`). `ExecStartPre` applies migrations every start; seeding is deliberately excluded because it is a one-off, **destructive** reset, never a boot step. | Host-specific unit (paths/user) vs a portable container. The committed unit is a template; Docker Compose is still provided for reviewers. |
+
 ---
 
 ## Notes for the reviewer
+
+- **Live demo**: `https://email-context.umeshkedimi.com` — seeded, over HTTPS. Demo
+  accounts use password `Demo1234!` (e.g. `diane.sterling@sterlingvance.com` for a
+  firm admin, `platform@ascendcpa.com` for the Ascend superuser).
 
 - **Secrets** are never committed. `.env` is git-ignored; real keys are generated on
   the server. `.env.example` documents the required variables.

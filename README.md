@@ -2,6 +2,10 @@
 
 ![CI](https://github.com/umeshkedimi/email-context/actions/workflows/ci.yml/badge.svg)
 
+**Live demo:** [email-context.umeshkedimi.com](https://email-context.umeshkedimi.com) —
+seeded, over HTTPS. Sign in as `diane.sterling@sterlingvance.com` (firm admin) or
+`platform@ascendcpa.com` (Ascend superuser); every demo password is `Demo1234!`.
+
 Backend for **Ascend**, a network of CPA firms. Several accountants email the same
 client to gather tax-return information but can't see each other's threads — so the
 client gets asked the same things twice and context is lost. This service captures
@@ -235,18 +239,29 @@ The summarizer is the AI surface, and it's built to be trustworthy and swappable
 
 ## Deployment
 
-Designed for a small Linux host (a DigitalOcean droplet is used for this project).
+Runs on a small Linux host (a DigitalOcean droplet for this project), live at
+[email-context.umeshkedimi.com](https://email-context.umeshkedimi.com).
 
 ```bash
 # on the host: pull, install, migrate
 git pull && uv sync --frozen && uv run alembic upgrade head
 ```
 
-A sample systemd unit is provided at
-[`deploy/email-context.service`](deploy/email-context.service) (runs migrations on
-start, then uvicorn; seeding is intentionally *not* a boot step — it's a one-off,
-destructive operation). Put Postgres and Redis behind it and a reverse proxy
-(nginx/Caddy) in front for TLS.
+The production shape:
+
+- **`systemd` service** ([`deploy/email-context.service`](deploy/email-context.service))
+  runs uvicorn bound to `127.0.0.1:8000`, applies migrations on start
+  (`ExecStartPre`), and restarts on failure. Seeding is intentionally *not* a boot
+  step — it's a one-off, destructive reset. Logs stream to `journalctl -u
+  email-context`.
+- **nginx** reverse-proxies the domain to the localhost app, so uvicorn never
+  listens publicly.
+- **Let's Encrypt TLS** via certbot terminates HTTPS at nginx and redirects HTTP,
+  with automatic renewal.
+
+Postgres and Redis run alongside on the host. For a zero-setup local run, the
+Docker Compose stack ([`docker-compose.yml`](docker-compose.yml)) brings up the
+app, Postgres, and Redis together.
 
 ## Project layout
 
@@ -258,6 +273,7 @@ app/
   models/        SQLAlchemy ORM + enums
   schemas/       pydantic DTOs
   core/          config, security (JWT/bcrypt), crypto, cache, deps, logging
+  web/           thin browser client (static HTML/CSS/JS), served same-origin
 alembic/         migrations
 scripts/seed.py  idempotent demo dataset
 tests/           hermetic pytest suite

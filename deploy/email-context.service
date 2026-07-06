@@ -4,8 +4,11 @@
 #   sudo systemctl daemon-reload && sudo systemctl enable --now email-context
 # Logs:  journalctl -u email-context -f
 #
-# Assumes the repo is checked out at /opt/email-context with a .env alongside it
-# and uv installed at /usr/local/bin/uv. Adjust paths/User to your host.
+# Template — adjust WorkingDirectory / User / the uv path to your host. Assumes
+# the repo is checked out with its .env alongside; the app loads that .env itself
+# (pydantic-settings, relative to WorkingDirectory), so no EnvironmentFile is
+# needed here. Bound to 127.0.0.1: an nginx reverse proxy terminates TLS and
+# forwards to it, so uvicorn never listens on a public interface.
 
 [Unit]
 Description=Email Context & Summarization API
@@ -16,11 +19,10 @@ Wants=postgresql.service redis-server.service
 Type=simple
 User=www-data
 WorkingDirectory=/opt/email-context
-EnvironmentFile=/opt/email-context/.env
 # Apply migrations, then serve. Seeding is intentionally NOT run here — it is a
 # one-off, destructive operation (see scripts/seed.py), not a boot step.
 ExecStartPre=/usr/local/bin/uv run alembic upgrade head
-ExecStart=/usr/local/bin/uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+ExecStart=/usr/local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=3
 
