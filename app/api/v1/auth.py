@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import BAD_LOGIN, UNAUTHORIZED
 from app.core.deps import get_current_user
 from app.core.security import create_access_token, verify_password
 from app.db.session import get_db
@@ -10,7 +11,12 @@ from app.schemas.auth import CurrentUser, LoginRequest, TokenResponse
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Log in (email + password → JWT)",
+    responses={**BAD_LOGIN},
+)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     accountant = await AccountantRepository(db).get_by_email(body.email)
     # Same error whether the email is unknown or the password is wrong — avoids
@@ -28,7 +34,12 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> Token
     return TokenResponse(access_token=token)
 
 
-@router.get("/me", response_model=CurrentUser)
+@router.get(
+    "/me",
+    response_model=CurrentUser,
+    summary="The authenticated principal",
+    responses={**UNAUTHORIZED},
+)
 async def me(current: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     """Return the authenticated principal — useful for verifying a token."""
     return current

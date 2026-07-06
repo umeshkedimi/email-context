@@ -29,11 +29,51 @@ async def lifespan(app: FastAPI):
     get_logger("app").info("shutdown")
 
 
+DESCRIPTION = """
+Unified per-client email intelligence for CPA firms (**Ascend**). Every email
+between a firm's accountants and a client is captured and distilled into one
+AI-generated summary — actors, concluded discussions, and open action items.
+
+### Authentication
+All `/api/v1` routes except `POST /auth/login` require a **Bearer JWT**. Get one
+from `POST /auth/login`, click **Authorize** (top right), and paste the
+`access_token`. On the live demo every seeded account's password is `Demo1234!`.
+
+### Roles
+- **accountant** — read client context within their own firm
+- **firm_admin** — accountant rights + their firm's report
+- **superuser** — cross-firm (Ascend-wide) reports; belongs to no firm
+
+Cross-firm access returns **404, never 403** — the API never confirms that a
+resource exists to someone outside its firm.
+"""
+
+TAGS_METADATA = [
+    {"name": "auth", "description": "Log in and inspect the authenticated principal."},
+    {
+        "name": "summaries",
+        "description": "Read a client's summary and trigger regeneration — the only "
+        "endpoint that calls the LLM.",
+    },
+    {
+        "name": "reports",
+        "description": "Firm and network dashboards. Metadata only — reports never "
+        "decrypt summary content.",
+    },
+    {"name": "ops", "description": "Operational endpoints (liveness)."},
+]
+
 app = FastAPI(
     title="Email Context & Summarization System",
-    description="Unified per-client email intelligence for CPA firms.",
+    description=DESCRIPTION,
     version="0.1.0",
     lifespan=lifespan,
+    openapi_tags=TAGS_METADATA,
+    contact={"name": "Umesh Kedimi", "url": "https://github.com/umeshkedimi/email-context"},
+    servers=[
+        {"url": "https://email-context.umeshkedimi.com", "description": "Live demo"},
+        {"url": "http://localhost:8000", "description": "Local development"},
+    ],
 )
 
 
@@ -94,7 +134,7 @@ async def _handle_report_scope(request: Request, exc: ReportScopeError) -> JSONR
     )
 
 
-@app.get("/health", tags=["ops"])
+@app.get("/health", tags=["ops"], summary="Liveness probe")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 

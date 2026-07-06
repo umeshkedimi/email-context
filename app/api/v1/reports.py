@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import FIRM_NOT_FOUND, FORBIDDEN, REPORT_SCOPE, UNAUTHORIZED
 from app.core.deps import require_roles
 from app.db.session import get_db
 from app.schemas.auth import CurrentUser
@@ -17,7 +18,12 @@ _require_firm_reader = require_roles("firm_admin", "superuser")
 _require_superuser = require_roles("superuser")
 
 
-@router.get("/firm", response_model=FirmReport)
+@router.get(
+    "/firm",
+    response_model=FirmReport,
+    summary="Firm dashboard (client roster + staleness)",
+    responses={**UNAUTHORIZED, **FORBIDDEN, **REPORT_SCOPE, **FIRM_NOT_FOUND},
+)
 async def firm_report(
     firm_id: uuid.UUID | None = Query(
         default=None,
@@ -32,7 +38,12 @@ async def firm_report(
     return await ReportService(db).firm_report(user, firm_id)
 
 
-@router.get("/network", response_model=NetworkReport)
+@router.get(
+    "/network",
+    response_model=NetworkReport,
+    summary="Network rollup across all firms",
+    responses={**UNAUTHORIZED, **FORBIDDEN},
+)
 async def network_report(
     user: CurrentUser = Depends(_require_superuser),
     db: AsyncSession = Depends(get_db),

@@ -12,8 +12,14 @@ from app.db.session import get_db
 from app.repositories.accountant import AccountantRepository
 from app.schemas.auth import CurrentUser
 
-# Extracts "Authorization: Bearer <token>" and drives the Swagger "Authorize" button.
-bearer_scheme = HTTPBearer(auto_error=True)
+# Extracts "Authorization: Bearer <token>" and drives the Swagger "Authorize"
+# button. bearerFormat="JWT" surfaces the token type in the OpenAPI security
+# scheme; the description tells a docs reader exactly where to get a token.
+bearer_scheme = HTTPBearer(
+    auto_error=True,
+    bearerFormat="JWT",
+    description="Paste the access_token returned by POST /api/v1/auth/login.",
+)
 
 _UNAUTHORIZED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
