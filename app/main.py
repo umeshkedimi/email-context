@@ -10,7 +10,9 @@ from app.api.router import api_router
 from app.core.logging import configure_logging, get_logger
 from app.services.exceptions import (
     ClientNotFound,
+    FirmNotFound,
     NoEmailsToSummarize,
+    ReportScopeError,
     SummaryGenerationError,
 )
 
@@ -75,6 +77,19 @@ async def _handle_no_emails(request: Request, exc: NoEmailsToSummarize) -> JSONR
 @app.exception_handler(SummaryGenerationError)
 async def _handle_generation_error(request: Request, exc: SummaryGenerationError) -> JSONResponse:
     return JSONResponse(status_code=502, content={"detail": "Summary generation failed"})
+
+
+@app.exception_handler(FirmNotFound)
+async def _handle_firm_not_found(request: Request, exc: FirmNotFound) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": "Firm not found"})
+
+
+@app.exception_handler(ReportScopeError)
+async def _handle_report_scope(request: Request, exc: ReportScopeError) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "A superuser must specify firm_id for a firm report"},
+    )
 
 
 @app.get("/health", tags=["ops"])

@@ -20,3 +20,13 @@ class NoEmailsToSummarize(ServiceError):
 
 class SummaryGenerationError(ServiceError):
     """The LLM provider failed to produce a summary."""
+
+
+class FirmNotFound(ServiceError):
+    """Firm does not exist, or is outside the caller's scope (a firm_admin asking
+    for another firm). Both surface as 404 — we don't confirm existence."""
+
+
+class ReportScopeError(ServiceError):
+    """The report request is missing scope it needs — e.g. a superuser (who
+    belongs to no firm) requested a firm report without naming a firm."""
