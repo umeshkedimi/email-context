@@ -36,8 +36,28 @@ class Settings(BaseSettings):
     # reproducible, rather than letting the model embellish.
     llm_temperature: float = 0.0
 
+    # Context scaling — bound the LLM input so cost, latency, and quality stay
+    # controlled as a client's email history grows (see docs/DESIGN.md).
+    # Rough char/token heuristic keeps us tokenizer-free; the budget is a safety
+    # cap on the prompt, well under gpt-4o-mini's 128k context window.
+    summary_max_input_tokens: int = 60000
+    # Once a client has at least this many analyzed emails and a prior summary,
+    # a refresh only feeds the *new* emails (refine the running summary) instead
+    # of re-reading the whole history. Below the threshold a full pass is cheap
+    # and higher-quality, so we always do it.
+    incremental_refresh: bool = True
+    incremental_min_prior_emails: int = 20
+
     # Cache
     summary_cache_ttl_seconds: int = 3600
+
+    # Observability — OpenTelemetry tracing. Disabled by default so the app runs
+    # with no collector (local, tests, CI). Enable and point at an OTLP endpoint
+    # to ship traces to Jaeger/Tempo/Datadog/Honeycomb without code changes.
+    otel_enabled: bool = False
+    otel_service_name: str = "email-context"
+    otel_exporter_otlp_endpoint: str = ""  # e.g. http://localhost:4318
+    otel_console_export: bool = False  # dev: print spans to stdout, no collector
 
     # App
     env: str = "development"

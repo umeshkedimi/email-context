@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.logging import configure_logging, get_logger
+from app.core.telemetry import setup_telemetry
 from app.services.exceptions import (
     ClientNotFound,
     FirmNotFound,
@@ -75,6 +76,10 @@ app = FastAPI(
         {"url": "http://localhost:8000", "description": "Local development"},
     ],
 )
+
+# Opt-in distributed tracing (no-op unless OTEL_ENABLED). Instruments this app
+# plus SQLAlchemy and Redis; must run before requests are served.
+setup_telemetry(app)
 
 
 @app.middleware("http")

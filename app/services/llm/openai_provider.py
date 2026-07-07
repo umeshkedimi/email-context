@@ -24,10 +24,12 @@ from tenacity import (
     wait_exponential,
 )
 
+from app.core.telemetry import get_tracer
 from app.schemas.summary import SummaryContext, SummaryPayload, SummaryResult
 from app.services.llm.base import LLMProvider, build_prompt
 
 log = structlog.get_logger("app.llm")
+_tracer = get_tracer("app.llm")
 
 _RETRYABLE = (APIConnectionError, APITimeoutError, RateLimitError, InternalServerError)
 
@@ -55,53 +57,64 @@ class OpenAIProvider(LLMProvider):
         system, user = build_prompt(context)
         start = time.perf_counter()
 
-        try:
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(self._max_retries + 1),
-                wait=wait_exponential(multiplier=0.5, max=8),
-                retry=retry_if_exception_type(_RETRYABLE),
-                before_sleep=_log_retry,
-                reraise=True,
-            ):
-                with attempt:
-                    completion = await self._client.beta.chat.completions.parse(
-                        model=self._model,
-                        messages=[
-                            {"role": "system", "content": system},
-                            {"role": "user", "content": user},
-                        ],
-                        response_format=SummaryPayload,
-                        temperature=self._temperature,
-                    )
-        except Exception as exc:
-            log.error(
-                "llm_summarize_failed",
+        # The network call is the expensive op, so it gets its own span nested
+        # under the request. No-op when tracing is disabled.
+        with _tracer.start_as_current_span("llm.summarize") as span:
+            span.set_attribute("llm.model", self._model)
+            span.set_attribute("llm.email_count", len(context.emails))
+            span.set_attribute("llm.incremental", context.prior_summary is not None)
+
+            try:
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(self._max_retries + 1),
+                    wait=wait_exponential(multiplier=0.5, max=8),
+                    retry=retry_if_exception_type(_RETRYABLE),
+                    before_sleep=_log_retry,
+                    reraise=True,
+                ):
+                    with attempt:
+                        completion = await self._client.beta.chat.completions.parse(
+                            model=self._model,
+                            messages=[
+                                {"role": "system", "content": system},
+                                {"role": "user", "content": user},
+                            ],
+                            response_format=SummaryPayload,
+                            temperature=self._temperature,
+                        )
+            except Exception as exc:
+                log.error(
+                    "llm_summarize_failed",
+                    model=self._model,
+                    email_count=len(context.emails),
+                    latency_ms=round((time.perf_counter() - start) * 1000, 1),
+                    error=type(exc).__name__,
+                )
+                span.record_exception(exc)
+                raise
+
+            latency_ms = round((time.perf_counter() - start) * 1000, 1)
+            usage = getattr(completion, "usage", None)
+            payload = completion.choices[0].message.parsed
+
+            if payload is None:  # model refused or produced no parseable content
+                log.error("llm_summarize_empty", model=self._model, latency_ms=latency_ms)
+                raise ValueError("LLM returned no parseable summary payload")
+
+            span.set_attribute("llm.latency_ms", latency_ms)
+            span.set_attribute("llm.total_tokens", getattr(usage, "total_tokens", 0) or 0)
+
+            # Structured observability: cost (tokens), latency, and shape of the result,
+            # on the same log stream that already carries the HTTP request_id.
+            log.info(
+                "llm_summarize",
                 model=self._model,
                 email_count=len(context.emails),
-                latency_ms=round((time.perf_counter() - start) * 1000, 1),
-                error=type(exc).__name__,
+                latency_ms=latency_ms,
+                prompt_tokens=getattr(usage, "prompt_tokens", None),
+                completion_tokens=getattr(usage, "completion_tokens", None),
+                total_tokens=getattr(usage, "total_tokens", None),
+                actors=len(payload.actors),
+                open_action_items=len(payload.open_action_items),
             )
-            raise
-
-        latency_ms = round((time.perf_counter() - start) * 1000, 1)
-        usage = getattr(completion, "usage", None)
-        payload = completion.choices[0].message.parsed
-
-        if payload is None:  # model refused or produced no parseable content
-            log.error("llm_summarize_empty", model=self._model, latency_ms=latency_ms)
-            raise ValueError("LLM returned no parseable summary payload")
-
-        # Structured observability: cost (tokens), latency, and shape of the result,
-        # on the same log stream that already carries the HTTP request_id.
-        log.info(
-            "llm_summarize",
-            model=self._model,
-            email_count=len(context.emails),
-            latency_ms=latency_ms,
-            prompt_tokens=getattr(usage, "prompt_tokens", None),
-            completion_tokens=getattr(usage, "completion_tokens", None),
-            total_tokens=getattr(usage, "total_tokens", None),
-            actors=len(payload.actors),
-            open_action_items=len(payload.open_action_items),
-        )
-        return SummaryResult(payload=payload, model_used=self._model)
+            return SummaryResult(payload=payload, model_used=self._model)

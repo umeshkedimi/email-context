@@ -61,7 +61,8 @@ HTTP ─▶ api/ (FastAPI routers)         validation, auth dependency, HTTP map
 ```
 
 **Stack:** Python 3.12 · FastAPI · async SQLAlchemy 2.0 + psycopg3 · PostgreSQL 16 ·
-Redis 7 · Alembic · pydantic v2 · structlog · `uv` for packaging.
+Redis 7 · Alembic · pydantic v2 · structlog · OpenTelemetry (opt-in tracing) ·
+`uv` for packaging.
 
 **Data model:** `firms` ─┬─ `accountants` (users) · ─┬─ `clients` ─┬─ `emails`
 (the mock inbox) and └─ `email_summaries` (one per client, encrypted payload +
@@ -88,6 +89,14 @@ is in **[docs/DESIGN.md](docs/DESIGN.md)** — the highest-signal read. Headline
   at-rest encryption boundary survives into the cache.
 - **The LLM is behind an interface.** Vendor is a config swap, and a deterministic
   stub lets tests, CI, and keyless demos run with no network.
+- **Context stays bounded as history grows.** Past a threshold, a refresh feeds the
+  prior structured summary + only the *new* emails (incremental refresh, keyed off
+  the `emails_analyzed_count` high-water mark), with a token budget capping any
+  single pass — so a 200-email client doesn't re-send 200 emails or overflow the
+  context window. See [§8 in DESIGN.md](docs/DESIGN.md).
+- **Two observability pillars.** Structured JSON logs (request-id, latency, token
+  spend) plus **opt-in OpenTelemetry traces** (FastAPI/SQLAlchemy/Redis + an
+  `llm.summarize` span), exported vendor-neutrally over OTLP.
 
 ## Quick start
 
@@ -216,14 +225,14 @@ make test                                   # in-memory SQLite, stub LLM, no ser
 TEST_DATABASE_URL=postgresql+psycopg://… uv run pytest   # same suite, real Postgres
 ```
 
-The suite (42 tests) is hermetic by default — dialect-neutral models let it run
+The suite (51 tests) is hermetic by default — dialect-neutral models let it run
 against in-memory SQLite with the stub LLM and no Redis, so it needs zero
 services. The **same** tests run against Postgres by setting `TEST_DATABASE_URL`,
 which exercises the aggregate report SQL on the real engine. Coverage: the crypto
 core (AEAD round-trip, AAD replay rejection, key rotation, tamper detection),
 password/JWT, login enumeration protection, deleted-user token rejection,
-firm-scoped 404s, the GET/refresh flow and live staleness, and report role-gating
-and rollups.
+firm-scoped 404s, the GET/refresh flow and live staleness, context-scaling (token
+budget + incremental-vs-full refresh), and report role-gating and rollups.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push/PR:
 ruff lint + format check + the SQLite suite (hermetic job), and the full suite
@@ -255,7 +264,8 @@ observability.
   attacker can't enumerate registered emails.
 - **JWTs** are short-lived and the user row is re-loaded on every request, so a
   disabled/deleted account can't keep acting on a live token.
-- Every response carries an `x-request-id` for traceability.
+- Every response carries an `x-request-id` for traceability; opt-in OpenTelemetry
+  adds distributed traces (spans stamped with the same trace id on log lines).
 
 ## AI in this system
 
@@ -270,6 +280,10 @@ The summarizer is the AI surface, and it's built to be trustworthy and swappable
   in the emails only; it must not invent people, decisions, or action items.
 - **Resilience.** Transient provider errors are retried (tenacity); a failed
   refresh leaves the last good summary intact.
+- **Bounded context.** As a client's history grows to hundreds of emails, a
+  refresh feeds the prior structured summary + only the *new* emails (incremental
+  refresh) with a token-budget cap, so cost/latency stay flat and the prompt never
+  overflows the context window.
 
 ## Deployment
 

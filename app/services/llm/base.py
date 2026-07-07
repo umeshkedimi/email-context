@@ -19,6 +19,23 @@ _SYSTEM_PROMPT = (
     "commitments. If something is ambiguous, prefer leaving it out over guessing."
 )
 
+# Used when a prior summary is carried forward (incremental refresh): the model
+# updates the running summary from only the new emails, instead of re-reading the
+# whole history. This keeps each call bounded as the thread grows.
+_INCREMENTAL_SYSTEM_PROMPT = (
+    "You are an assistant for a CPA firm maintaining a running summary of one "
+    "client relationship. You are given the PREVIOUS summary (as JSON) and only "
+    "the NEW emails received since it was produced. Return an UPDATED summary "
+    "that:\n"
+    "- integrates the new emails into the prior state;\n"
+    "- keeps still-valid actors, concluded discussions, and open action items;\n"
+    "- moves an open action item into concluded_discussions when the new emails "
+    "show it was resolved;\n"
+    "- adds newly-raised action items and any newly-involved actors.\n"
+    "Use only the previous summary and the new emails. Do not invent facts, "
+    "amounts, or commitments. If something is ambiguous, prefer leaving it out."
+)
+
 
 def _render_email(e: EmailForSummary) -> str:
     subject = e.subject or "(no subject)"
@@ -29,12 +46,26 @@ def _render_email(e: EmailForSummary) -> str:
 
 
 def build_prompt(context: SummaryContext) -> tuple[str, str]:
-    """Return (system, user) messages for a chat-style provider."""
+    """Return (system, user) messages for a chat-style provider.
+
+    Two shapes: a full pass over the whole history, or — when `prior_summary` is
+    set — an incremental update from the prior state plus only the new emails.
+    """
+    body = "\n\n---\n\n".join(_render_email(e) for e in context.emails)
+
+    if context.prior_summary is not None:
+        header = (
+            f"Client: {context.client_name} <{context.client_email}>\n\n"
+            "=== PREVIOUS SUMMARY (JSON) ===\n"
+            f"{context.prior_summary.model_dump_json(indent=2)}\n\n"
+            f"=== NEW EMAILS ({len(context.emails)}), oldest first ===\n"
+        )
+        return _INCREMENTAL_SYSTEM_PROMPT, header + body
+
     header = (
         f"Client: {context.client_name} <{context.client_email}>\n"
         f"Emails ({len(context.emails)}), oldest first:\n"
     )
-    body = "\n\n---\n\n".join(_render_email(e) for e in context.emails)
     return _SYSTEM_PROMPT, header + "\n" + body
 
 

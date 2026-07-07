@@ -44,7 +44,8 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | **Provider behind an `LLMProvider` interface** | Call the vendor SDK directly from services | Swappable model/vendor, and a stub implementation lets tests and CI run with no API key or network. | One layer of indirection. Worth it for testability and vendor independence. |
 | **OpenAI GPT** as the default model (pluggable) | Another single hard-wired vendor | The panel left the choice open, so we pick a capable, well-supported model and — more importantly — keep it behind the `LLMProvider` interface so the vendor is a config/implementation swap, not a rewrite. | Vendor lock-in risk if used directly; the interface neutralizes it. Model quality/cost is a tunable, not a fixed commitment. |
 | **Structured (schema-validated) output** → actors · concluded discussions · open action items | Free-form text summary | The consumer is a dashboard with defined sections; a validated schema guarantees the shape and lets us store/query parts. | The model must conform to a schema, occasionally needing a retry. Handled by the provider layer. |
-| **Per-call observability** — a structured log of model, latency, and token usage (prompt/completion/total) on every summarize, plus a line per retry | Log only on error; a full metrics/tracing stack | Cost, latency, and reliability of the one *paid* operation become visible on the same structlog stream that carries the request-id — for a few lines of code. Retry logging surfaces rate-limit/timeout patterns. | Logs, not metrics. Persisting token spend per row or exporting to OTel/Prometheus is the next step, not built here. |
+| **Per-call observability** — a structured log of model, latency, and token usage (prompt/completion/total) on every summarize, plus a line per retry, plus a dedicated `llm.summarize` **OpenTelemetry span** | Log only on error; logs with no traces | Cost, latency, and reliability of the one *paid* operation become visible on the same structlog stream that carries the request-id — for a few lines of code. Retry logging surfaces rate-limit/timeout patterns; the span attributes latency to the LLM call within the request trace (see §8). | Persisting token spend per row is still a possible next step. Tracing is opt-in, so it's off unless a collector is configured. |
+| **Bounded context as history grows** — incremental refresh + a token budget (see §8) | Always re-send the entire thread to the model | Re-reading 200+ emails on every refresh scales cost/latency linearly and eventually overflows the context window. Carrying the prior *structured* summary and feeding only the new emails keeps each call small; a token budget caps any single pass. | Rolling summaries can drift over many iterations — mitigated by carrying the compact structured payload and periodically doing a full pass. |
 | **Two-layer opt-in evals** (`make eval`, `evals/`): structural grounding **plus an LLM-as-judge** | Only string checks; a hosted eval platform | Cheap deterministic checks assert every actor traces back to the emails and obvious items/decisions are captured. On top, an LLM-as-judge scores faithfulness/coverage semantically. The judge runs a *stronger* model (`gpt-4o`) than the generator (`gpt-4o-mini`) — same vendor, so some self-preference bias remains, but a stronger grader offsets it while keeping the stack to one vendor and one key. Both kept out of the hermetic unit suite. | Judge scores aren't deterministic (mitigated by a fixed rubric + structured output + thresholds) and cost tokens, so evals run on demand, not in CI. A cross-vendor judge would remove the self-preference bias entirely, at the cost of a second vendor/key — deliberately not taken here for simplicity. |
 
 ## 5. Data protection ✅
@@ -79,6 +80,62 @@ Status legend: ✅ implemented · 🔜 planned (design fixed, code pending).
 | **JWT held in `localStorage`** | httpOnly, `SameSite` cookie + CSRF token | Keeps the API stateless and the auth story single-path — the browser is just another bearer-token client. | The token is reachable by XSS. Consciously accepted for a thin demo; the production fix is an httpOnly cookie + CSRF, plus a short access-token TTL with refresh. |
 | **nginx reverse proxy + Let's Encrypt TLS; app bound to `127.0.0.1`** | Expose uvicorn directly on a public port; terminate TLS in-app | The app never listens publicly — nginx terminates TLS and forwards to localhost, which is the standard, auditable production shape and gives free auto-renewing certs. | One more moving part (nginx + certbot). Standard operational cost. |
 | **Run as a `systemd` service; migrations on start, seeding is not** | Run under a process manager / in Docker on the host; seed on boot | systemd gives restart-on-failure, boot persistence, and one log stream (`journalctl`). `ExecStartPre` applies migrations every start; seeding is deliberately excluded because it is a one-off, **destructive** reset, never a boot step. | Host-specific unit (paths/user) vs a portable container. The committed unit is a template; Docker Compose is still provided for reviewers. |
+
+## 8. Scaling email context & observability
+
+### Handling long histories (100–200+ emails per client)
+
+The naïve approach — load every email and send it in one prompt on every refresh —
+is correct at 5–40 emails but breaks down as a thread grows:
+
+- **Context-window limit.** ~200 emails × ~500 tokens ≈ 100k tokens, near
+  `gpt-4o-mini`'s 128k ceiling; long quoted reply-chains overflow it and the call
+  hard-fails.
+- **Cost & latency scale linearly.** Every refresh re-reads the whole history even
+  when a single new email arrived.
+- **Quality decays ("lost in the middle").** Models attend worse to the middle of
+  very long prompts, so the summary gets vaguer as history grows.
+
+The system addresses this with two bounded mechanisms:
+
+1. **Incremental refresh (the primary strategy).** We already track
+   `emails_analyzed_count`; since emails are append-only and ordered by `sent_at`,
+   that count is a high-water mark — `emails[:analyzed]` are reflected in the stored
+   summary, `emails[analyzed:]` are new. Once a client passes
+   `INCREMENTAL_MIN_PRIOR_EMAILS`, a refresh feeds the **prior structured summary +
+   only the new emails** to the model, which returns an updated summary. Each call
+   stays small no matter how long the total history is. Below the threshold a full
+   pass is cheap and higher-quality, so we keep doing it. Structured logs show the
+   `mode` and `emails_sent_to_llm` per refresh, so an incremental refresh visibly
+   sends 2 emails instead of 200.
+2. **Token budget (safety net).** `SUMMARY_MAX_INPUT_TOKENS` caps any single pass
+   (rough ~4 chars/token heuristic, no tokenizer dependency). If a first-time client
+   already has a huge backlog, the oldest emails are dropped — recency is the best
+   proxy for relevance — and the truncation is logged.
+
+**Considered and deferred:** *map-reduce* (chunk-summarize then summarize the
+summaries) is the proper fix for a huge cold-start backlog and is the documented
+next step; the token budget is a stopgap for that case. *RAG/retrieval* was
+rejected — retrieval answers a *query*, but a relationship summary must cover the
+*whole* history, so it's the wrong tool here. The one honest caveat: rolling
+summaries can drift over many iterations, mitigated by carrying the compact
+*structured* payload (not free text) and periodically forcing a full pass.
+
+### OpenTelemetry tracing (opt-in)
+
+Structured logs are one pillar; **traces** are the second. OpenTelemetry turns one
+request into a timed tree of spans — HTTP → SQLAlchemy query → Redis op →
+`llm.summarize` — so latency is *attributed* to a sub-operation instead of guessed
+at. FastAPI, SQLAlchemy, and Redis are auto-instrumented; the LLM call gets a
+hand-written span with model/token/incremental attributes. Trace and span ids are
+stamped onto every structlog line, so logs and traces cross-reference.
+
+It is **opt-in** (`OTEL_ENABLED`, default off): with no collector the app runs
+unchanged (local, tests, CI), so there is no hard runtime dependency. Export is
+**vendor-neutral** over OTLP — the same code ships to Jaeger, Tempo, Datadog, or
+Honeycomb by changing only the endpoint (or `OTEL_CONSOLE_EXPORT` for a
+backend-less demo). This mirrors the `LLMProvider` philosophy: depend on a neutral
+interface, keep the backend a config swap.
 
 ---
 

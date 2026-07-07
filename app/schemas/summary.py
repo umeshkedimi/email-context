@@ -55,11 +55,18 @@ class EmailForSummary(BaseModel):
 
 
 class SummaryContext(BaseModel):
-    """The full input handed to a provider to summarize one client."""
+    """The full input handed to a provider to summarize one client.
+
+    `prior_summary` carries the previous structured summary on an *incremental*
+    refresh: the provider is then given the prior state plus only the new emails,
+    so each call stays bounded no matter how long the history grows. It is None on
+    a full (from-scratch) summarization.
+    """
 
     client_name: str
     client_email: str
     emails: list[EmailForSummary]
+    prior_summary: SummaryPayload | None = None
 
 
 class SummaryResult(BaseModel):

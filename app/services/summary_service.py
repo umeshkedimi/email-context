@@ -36,6 +36,11 @@ log = structlog.get_logger("app.summary")
 
 _SUPERUSER = "superuser"
 
+# Rough token estimate: ~4 chars/token for English. Keeps us tokenizer-free
+# (no tiktoken dependency); swap in a real tokenizer if exact counts ever matter.
+_CHARS_PER_TOKEN = 4
+_PER_EMAIL_OVERHEAD_TOKENS = 40  # header/framing added around each email body
+
 
 def _cache_key(client_id: uuid.UUID) -> str:
     return f"summary:{client_id}"
@@ -134,6 +139,97 @@ class SummaryService:
             updated_at=blob.get("updated_at"),
         )
 
+    # --- context assembly (scales with history) ---
+
+    async def _load_prior_summary(self, client_id: uuid.UUID) -> tuple[SummaryPayload | None, int]:
+        """The client's existing summary (decrypted) and how many emails it covered.
+        Returns (None, 0) when no summary has ever been generated."""
+        row = await self.summaries.get_by_client(client_id)
+        if row is None:
+            return None, 0
+        plaintext = self.encryptor.decrypt(
+            row.payload_encrypted,
+            row.nonce,
+            row.key_version,
+            associated_data=self._aad(client_id),
+        )
+        return SummaryPayload.model_validate_json(plaintext), row.emails_analyzed_count
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        return len(text) // _CHARS_PER_TOKEN
+
+    def _within_budget(self, emails: list[EmailForSummary]) -> list[EmailForSummary]:
+        """Keep the most recent emails that fit the input token budget.
+
+        Truncation is a safety net for a single oversized pass (e.g. a first-time
+        client with a huge backlog). We drop oldest-first because recency is the
+        best proxy for what still matters; a full backlog is better handled by the
+        map-reduce path documented in DESIGN.md.
+        """
+        budget = self.settings.summary_max_input_tokens
+        kept: list[EmailForSummary] = []
+        used = 0
+        for e in reversed(emails):  # newest first
+            cost = self._estimate_tokens(e.body) + _PER_EMAIL_OVERHEAD_TOKENS
+            if kept and used + cost > budget:
+                break
+            used += cost
+            kept.append(e)
+        kept.reverse()  # restore oldest-first for the model
+        dropped = len(emails) - len(kept)
+        if dropped:
+            log.warning(
+                "summary_input_truncated",
+                dropped=dropped,
+                kept=len(kept),
+                budget_tokens=budget,
+                est_tokens=used,
+            )
+        return kept
+
+    @staticmethod
+    def _to_summary_emails(emails: list) -> list[EmailForSummary]:
+        return [
+            EmailForSummary(
+                sender=e.sender,
+                direction=e.direction.value,
+                sent_at=e.sent_at,
+                subject=e.subject,
+                body=e.body,
+            )
+            for e in emails
+        ]
+
+    def _build_refresh_context(
+        self, client: Client, emails: list, prior: SummaryPayload | None, analyzed: int
+    ) -> tuple[SummaryContext, str, int]:
+        """Choose incremental vs. full and apply the token budget.
+
+        Emails are append-only and ordered oldest-first, so `analyzed` is a
+        high-water mark: emails[:analyzed] are already reflected in `prior`, and
+        emails[analyzed:] are new. Once a client is past the threshold and only a
+        delta arrived, we refine `prior` from just the new emails; otherwise we do
+        a full, budget-capped pass. Returns (context, mode, emails_sent_to_llm).
+        """
+        total = len(emails)
+        new_emails = emails[analyzed:] if 0 < analyzed < total else []
+        incremental = (
+            self.settings.incremental_refresh
+            and prior is not None
+            and analyzed >= self.settings.incremental_min_prior_emails
+            and len(new_emails) > 0
+        )
+        source = new_emails if incremental else emails
+        selected = self._within_budget(self._to_summary_emails(source))
+        context = SummaryContext(
+            client_name=client.name,
+            client_email=client.email,
+            emails=selected,
+            prior_summary=prior if incremental else None,
+        )
+        return context, ("incremental" if incremental else "full"), len(selected)
+
     # --- refresh (the only LLM trigger) ---
 
     async def refresh_summary(self, client_id: uuid.UUID, user: CurrentUser) -> SummaryResponse:
@@ -142,20 +238,8 @@ class SummaryService:
         if not emails:
             raise NoEmailsToSummarize
 
-        context = SummaryContext(
-            client_name=client.name,
-            client_email=client.email,
-            emails=[
-                EmailForSummary(
-                    sender=e.sender,
-                    direction=e.direction.value,
-                    sent_at=e.sent_at,
-                    subject=e.subject,
-                    body=e.body,
-                )
-                for e in emails
-            ],
-        )
+        prior, analyzed = await self._load_prior_summary(client_id)
+        context, mode, sent_to_llm = self._build_refresh_context(client, emails, prior, analyzed)
 
         provider = get_llm_provider()
         try:
@@ -187,7 +271,10 @@ class SummaryService:
         log.info(
             "summary_refreshed",
             client_id=str(client_id),
-            emails=len(emails),
+            mode=mode,  # "incremental" (only new emails) or "full"
+            total_emails=len(emails),
+            emails_sent_to_llm=sent_to_llm,
+            analyzed_before=analyzed,
             model=result.model_used,
         )
         return SummaryResponse(

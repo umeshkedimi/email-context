@@ -20,6 +20,12 @@ dependencies = [
     "structlog>=24.4",
     "tenacity>=9.0",
     "python-multipart>=0.0.12",
+    # Observability: OpenTelemetry tracing (opt-in via OTEL_ENABLED).
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
+    "opentelemetry-instrumentation-fastapi>=0.50b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.50b0",
+    "opentelemetry-instrumentation-redis>=0.50b0",
 ]
 
 # PEP 735 dependency group — installed by `uv sync` by default, excluded with --no-dev.
